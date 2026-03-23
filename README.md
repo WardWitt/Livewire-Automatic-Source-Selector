@@ -1,6 +1,6 @@
 # [Livewire Simple Delegation Switcher](https://mediarealm.com.au/livewire-switcher/)
 
-This application allows you to simply switch between different Livewire Sources (Inputs) and send them to a single Livewire Destination (Output). It's designed to be used as a simple studio delegation switcher. It also supports GPI as inputs (either to switch, or change the button indications), and GPIO Trigger outputs. It runs on Microsoft Windows and the Raspberry Pi (Raspbian).
+This application allows you to simply switch between different Livewire Sources (Inputs) and send them to a single Livewire Destination (Output). It's designed to be used as a simple studio delegation switcher. It also supports GPI as inputs (either to switch, or change the button indications), and GPIO Trigger outputs. It runs on Raspberry Pi.
 
 ![Livewire Simple Delegation Switcher - Screenshot](https://mediarealm.com.au/wp-content/uploads/2017/07/Livewire-Simple-Delegation-Switcher-Screenshot.png)
 
@@ -15,14 +15,10 @@ This software has been developed by Anthony Eden (https://mediarealm.com.au/). V
 
 ## Getting Started
 
-1. Download the latest version from the "[Releases](https://github.com/anthonyeden/Livewire-Simple-Delegation-Switcher/releases)" page
-2. Unzip the files someplace on your computer
-3. Rename 'config-sample.json' to 'config.json'
-4. Edit config.json to meet your needs
+1. Rename 'config-sample.json' to 'config.json'
+2. Edit config.json to meet your needs
 
  * You'll need to include the IP Address of your Output Node, the physical output number on your Node, and Livewire Channel Numbers for each source
-
-5. Run LW-Delegation-Switcher.exe
 
 If all has gone well, you'll now be able to switch the source to your destination. The source highlighted in "Red" is the currently active source.
 
@@ -62,17 +58,16 @@ Under some circumstances, you may also like to set option "DisableRouteChange" t
 3. Open Terminal and run the following commands:
 
 ```
-sudo apt-get install python2 git
-git clone https://github.com/anthonyeden/Livewire-Simple-Delegation-Switcher/
+git clone https://github.com/WardWitt/Livewire-Simple-Delegation-Switcher.git
 chmod +x Livewire-Simple-Delegation-Switcher/start.sh
-echo "@/home/pi/Livewire-Simple-Delegation-Switcher/start.sh" >> .config/lxsession/LXDE-pi/autostart
-cp Livewire-Simple-Delegation-Switcher/config-sample.json Livewire-Simple-Delegation-Switcher/config.json
+echo "~/Livewire-Simple-Delegation-Switcher/start.sh" >> ~/.config/labwc/autostart
+cp ~/Livewire-Simple-Delegation-Switcher/config-sample-silence-detect.json ~/Livewire-Simple-Delegation-Switcher/config.json
 ``` 
 
 4. To edit the configuration, run this command:
 
 ```
-nano Livewire-Simple-Delegation-Switcher/config.json
+nano ~/Livewire-Simple-Delegation-Switcher/config.json
 ```
 
 Press Ctrl + X to close the Nano text editor.
@@ -80,8 +75,8 @@ Press Ctrl + X to close the Nano text editor.
 6. The Livewire Simple Delegation Switcher should now load automatically whenever you login to your Raspberry Pi (there is a 10 second delay to give the Pi a chance to connect to the network). To start it manually, run the following commands from the terminal:
 
 ```
-cd /home/pi/Livewire-Simple-Delegation-Switcher/
-python2 LW-Delegation-Switcher.py
+cd ~/Livewire-Simple-Delegation-Switcher/
+python LW-Delegation-Switcher.py
 ```
 
 ### Upgrading - Raspberry Pi

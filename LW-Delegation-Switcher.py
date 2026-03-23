@@ -13,12 +13,15 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/libs")
 import json
 from LWRPClient import LWRPClient
 import AxiaLivewireAddressHelper
-import Tkinter as tk
-import tkMessageBox
+import tkinter as tk
+import tkinter.messagebox as tkMessageBox
 from functools import partial
 import math
 import requests
-import thread
+import threading
+
+import asyncio
+from pysnmp.hlapi.v3arch.asyncio import *
 
 class Application(tk.Frame):
 
@@ -49,6 +52,20 @@ class Application(tk.Frame):
     LWRP_CurrentOutput = None
     LWRP_Sources = []
 
+    # Configuration parameters for Silence Detection
+    LWRP_SilenceDetectEnabled = False
+    LWRP_SilenceDuration = 10000
+    LWRP_SilenceThreshold = -500
+
+    # Priority auto-switching (choose highest-priority non-silent input)
+    PriorityAutoEnabled = False
+    PriorityCount = 5
+    PriorityStableTime = 5
+    PriorityNonSilentSince = {}
+    PriorityMonitorThread = None
+    PriorityMonitorStop = None
+    PriorityCurrentAutoIndex = None
+
     # Configuration parameters for the communication with the Input GPI Device
     LWRP_GPI_IpAddress = None
     LWRP_GPI_PortNumber = 93
@@ -73,6 +90,9 @@ class Application(tk.Frame):
 
     # This is a queue of events to execute in the main GUI thread
     callbackEventQueue = []
+
+    previousInput = 0
+    switchReason = "None"
 
     def __init__(self, master = None):
         # Setup the application and display window
@@ -117,10 +137,31 @@ class Application(tk.Frame):
 
         if self.autoCheckVersion is True:
             # Check for version updates in another thread
-            thread.start_new_thread(self.versionCheck, ())
+            threading.Thread(target=self.versionCheck, daemon=True).start()
         
         # Start executing callback events in the main thread
         self.root.after(10, self.callbackMainThreadExecution)
+
+    async def send_input_changed_trap(self, currentInput):
+        snmpEngine = SnmpEngine()
+
+        errorIndication, errorStatus, errorIndex, varBinds = await send_notification(
+            snmpEngine,
+            CommunityData('public', mpModel=1),  # SNMPv2c
+            await UdpTransportTarget.create((self.SNMPTrapIP, 162)),
+            ContextData(),
+            'trap',
+            NotificationType(
+                ObjectIdentity('1.3.6.1.4.1.65248.2.1')
+            ).add_varbinds(
+                ('1.3.6.1.4.1.65248.1.1', Integer(currentInput)),   # currentInput
+                ('1.3.6.1.4.1.65248.1.2', Integer(self.previousInput)),   # previousInput
+                ('1.3.6.1.4.1.65248.1.3', OctetString(self.switchReason))   # switchReason
+            )
+        )
+
+        if errorIndication:
+            print("Error:", errorIndication)
 
     def setupConfig(self):
         # Reads the 'config.json' file and stores the details in this class
@@ -166,6 +207,33 @@ class Application(tk.Frame):
         if "GPI_DevicePassword" in config and config['GPI_DevicePassword'] is not None:
             self.LWRP_GPI_Password = config['GPI_DevicePassword']
 
+        if "SilenceDetectEnabled" in config and config['SilenceDetectEnabled'] is True:
+            self.LWRP_SilenceDetectEnabled = True
+
+        if "SilenceDuration" in config:
+            self.LWRP_SilenceDuration = int(config['SilenceDuration'])
+
+        if "SilenceThreshold" in config:
+            self.LWRP_SilenceThreshold = int(config['SilenceThreshold'])
+
+        if "PriorityAutoEnabled" in config and config['PriorityAutoEnabled'] is True:
+            self.PriorityAutoEnabled = True
+
+        if "PriorityCount" in config:
+            try:
+                self.PriorityCount = int(config['PriorityCount'])
+            except:
+                pass
+
+        if "PriorityStableTime" in config:
+            try:
+                self.PriorityStableTime = int(config['PriorityStableTime'])
+            except:
+                pass
+
+        if "SNMPTrapRX" in config:
+            self.SNMPTrapIP = config['SNMPTrapRX']
+
         for source in config['Sources']:
             if source['SourceNum'][:4] == "sip:":
                 self.LWRP_Sources.append(
@@ -177,6 +245,7 @@ class Application(tk.Frame):
                         "GPIOTriggers": [],
                         "DisableRouteChange": False,
                         "GPI_IndicationOnly": False,
+                        "Silence": False
                     }
                 )
             else:
@@ -189,6 +258,7 @@ class Application(tk.Frame):
                         "GPIOTriggers": [],
                         "DisableRouteChange": False,
                         "GPI_IndicationOnly": False,
+                        "Silence": False
                     }
                 )
 
@@ -206,15 +276,15 @@ class Application(tk.Frame):
             if "TriggerGPIO" in source:
                 for trigger in source['TriggerGPIO']:
                     if "DeviceIP" not in trigger or "Type" not in trigger or "Port" not in trigger or "Pin" not in trigger or "State" not in trigger :
-                        print "GPIO trigger has not been setup correctly"
+                        print ("GPIO trigger has not been setup correctly")
                         continue
                     
                     if trigger['Type'] != "GPO" and trigger['Type'] != "GPI":
-                        print "GPIO Trigger Type must be 'GPO' or 'GPI'"
+                        print ("GPIO Trigger Type must be 'GPO' or 'GPI'")
                         continue
                     
                     if trigger['State'] != "low" and trigger['State'] != "high":
-                        print "GPIO Trigger State must be 'low' or 'high'"
+                        print ("GPIO Trigger State must be 'low' or 'high'")
                         continue
 
                     if trigger['DeviceIP'] not in self.LWRP_GPIO_Triggers:
@@ -258,8 +328,8 @@ class Application(tk.Frame):
             Config_JSON = open(filename).read()
             return json.loads(Config_JSON)
         
-        except Exception, e:
-            print "EXCEPTION:", e
+        except Exception as e:
+            print ("EXCEPTION:", e)
             return False
 
     def connectLWRP(self):
@@ -267,18 +337,33 @@ class Application(tk.Frame):
         
         try:
             self.LWRP = LWRPClient(self.LWRP_IpAddress, self.LWRP_PortNumber)
-        except Exception, e:
-            print "EXCEPTION:", e
+        except Exception as e:
+            print ("EXCEPTION:", e)
             return (False, "Cannot connect to LiveWire device")
         
         try:
             self.LWRP.login(self.LWRP_Password)
-        except Exception, e:
-            print "EXCEPTION:", e
+        except Exception as e:
+            print ("EXCEPTION:", e)
             return (False, "Cannot login to device")
 
         # Find the current status of the output
         destinationList = self.LWRP.destinationData()
+
+        # Set silence detection if enabled in the config
+        if self.LWRP_SilenceDetectEnabled is True:
+            # Collect unique input numbers from configured sources
+            used_inputs = set()
+            for source in self.LWRP_Sources:
+                if source['LWNumber'] is not None:
+                    used_inputs.add(source['LWNumber'])
+            
+            # Set silence thresholds only for used inputs
+            for input_num in sorted(used_inputs):
+                self.LWRP.setSilenceThreshold("in", input_num, self.LWRP_SilenceThreshold, self.LWRP_SilenceDuration)
+
+            self.LWRP.levelAlertSub(self.callbackLevelAlertLWRP)
+    
         self.LWRP_CurrentOutput = self.findOutputLWRP(destinationList, self.LWRP_OutputChannel)
 
         self.LWRP.destinationDataSub(self.callbackOutputsLWRP)
@@ -290,14 +375,14 @@ class Application(tk.Frame):
             try:
                 # Create new connection for GPI device
                 self.LWRP_GPI = LWRPClient(self.LWRP_GPI_IpAddress, self.LWRP_GPI_PortNumber)
-            except Exception, e:
-                print "EXCEPTION:", e
+            except Exception as e:
+                print ("EXCEPTION:", e)
                 return (False, "Cannot connect to GPI LiveWire device")
             
             try:
                 self.LWRP_GPI.login(self.LWRP_GPI_Password)
-            except Exception, e:
-                print "EXCEPTION:", e
+            except Exception as e:
+                print ("EXCEPTION:", e)
                 return (False, "Cannot login to GPI device")
 
         if self.LWRP_GPI is not None:
@@ -307,17 +392,91 @@ class Application(tk.Frame):
             try:
                 # Create new connection for GPI device
                 self.LWRP_GPIO_Triggers[device]['Connection'] = LWRPClient(self.LWRP_GPIO_Triggers[device]['DeviceIP'], self.LWRP_GPIO_Triggers[device]['DevicePort'])
-            except Exception, e:
-                print "EXCEPTION:", e
-                print "Cannot connect to GPIO Trigger LiveWire device:", device
+            except Exception as e:
+                print ("EXCEPTION:", e)
+                print ("Cannot connect to GPIO Trigger LiveWire device:", device)
             
             try:
                 self.LWRP_GPIO_Triggers[device]['Connection'].login(self.LWRP_GPIO_Triggers[device]['DevicePassword'])
-            except Exception, e:
-                print "EXCEPTION:", e
-                print "Cannot login to GPIO Trigger device:", device
+            except Exception as e:
+                print ("EXCEPTION:", e)
+                print ("Cannot login to GPIO Trigger device:", device)
+
+        # Start priority monitor if configured
+        try:
+            self.startPriorityMonitor()
+        except:
+            pass
 
         return (True, self.LWRP)
+
+    def startPriorityMonitor(self):
+        if self.PriorityAutoEnabled is not True:
+            return
+
+        # Initialize tracking state
+        self.PriorityNonSilentSince = {}
+        self.PriorityCurrentAutoIndex = None
+        self.PriorityMonitorStop = threading.Event()
+        self.PriorityMonitorThread = threading.Thread(target=self.priorityMonitorLoop, daemon=True)
+        self.PriorityMonitorThread.start()
+
+    def stopPriorityMonitor(self):
+        if self.PriorityMonitorStop is not None:
+            self.PriorityMonitorStop.set()
+            try:
+                if self.PriorityMonitorThread is not None and self.PriorityMonitorThread.is_alive():
+                    self.PriorityMonitorThread.join(timeout=1)
+            except:
+                pass
+
+    def priorityMonitorLoop(self):
+        # Monitors first N priority sources and chooses highest-priority non-silent
+        import time
+        while not (self.PriorityMonitorStop is not None and self.PriorityMonitorStop.is_set()):
+            now = time.time()
+
+            # Only operate when silence detection is enabled and sources exist
+            if not self.LWRP_SilenceDetectEnabled:
+                time.sleep(0.5)
+                continue
+
+            candidate_index = None
+
+            for i in range(0, min(self.PriorityCount, len(self.LWRP_Sources))):
+                src = self.LWRP_Sources[i]
+
+                # Consider only sources which have silence info (LWNumber)
+                if 'Silence' not in src or src['Silence'] is None:
+                    # No info yet
+                    if i in self.PriorityNonSilentSince:
+                        del self.PriorityNonSilentSince[i]
+                    continue
+
+                # src['Silence'] == True means silent; False means non-silent
+                if src['Silence'] is False:
+                    # mark non-silent time
+                    if i not in self.PriorityNonSilentSince:
+                        self.PriorityNonSilentSince[i] = now
+                else:
+                    if i in self.PriorityNonSilentSince:
+                        del self.PriorityNonSilentSince[i]
+
+                if i in self.PriorityNonSilentSince:
+                    candidate_index = i
+                    break
+
+            # If we have a candidate and it's been non-silent for stable time, switch
+            if candidate_index is not None:
+                started = self.PriorityNonSilentSince.get(candidate_index, None)
+                if started is not None and (now - started) >= float(self.PriorityStableTime):
+                    # Only switch if different from current auto-choice
+                    if self.PriorityCurrentAutoIndex != candidate_index:
+                        # Schedule switch on main thread
+                        self.callbackEventQueue.append(lambda idx=candidate_index: self.sourceBtnPress(idx, trigger='Auto-switch'))
+                        self.PriorityCurrentAutoIndex = candidate_index
+                        self.switchReason = 'Auto-switch'
+            time.sleep(0.5)
 
     def findOutputLWRP(self, destinationList, destinationNumber):
         # Find the current output stream number for the specified output
@@ -342,7 +501,6 @@ class Application(tk.Frame):
     def callbackOutputsLWRP(self, data):
         # Find the current status of the output
         newSource = self.findOutputLWRP(data, self.LWRP_OutputChannel)
-
         if newSource is not None and newSource is not False:
             self.LWRP_CurrentOutput = newSource
 
@@ -355,7 +513,8 @@ class Application(tk.Frame):
             if "GPI_Port" in source and "GPI_Pin" in source and source["GPI_Port"] == int(data[0]['num']):
                 if source['GPI_IndicationOnly'] is False and data[0]['pin_states'][source['GPI_Pin']]['state'] == "low":
                     # Switch when the specified pin is low
-                    self.callbackEventQueue.append(lambda: self.sourceBtnPress(sourceNum))
+                    self.callbackEventQueue.append(lambda: self.sourceBtnPress(sourceNum, trigger='GPI'))
+                    self.switchReason = 'GPI'
                     return True
 
                 elif source['GPI_IndicationOnly'] is True:
@@ -380,6 +539,14 @@ class Application(tk.Frame):
         self.callbackEventQueue[:] = [x for x in self.callbackEventQueue if x not in deleteEvents]
         
         self.root.after(10, self.callbackMainThreadExecution)
+
+    def callbackLevelAlertLWRP(self, alertData):
+        for num, sourceAlert in enumerate(alertData):
+            for sourceNum, sourceData in enumerate(self.LWRP_Sources):
+                if(self.LWRP_Sources[sourceNum]['LWNumber']) == int(sourceAlert['num']):
+                    self.LWRP_Sources[sourceNum]['Silence'] = sourceAlert['attributes']['silence']
+
+        self.callbackEventQueue.append(self.sourceBtnUpdate)
 
     def setupMainInterface(self):
         # Setup the interface with a list of source select buttons
@@ -425,10 +592,8 @@ class Application(tk.Frame):
 
     def sourceBtnUpdate(self):
         # Update the status of all the source buttons on screen
-
         for sourceNum, sourceData in enumerate(self.LWRP_Sources):
             self.top.rowconfigure(self.columnCurrentCount + 1, weight = 1, pad = 20)
-            
             if len(self.sourceButtons) >= sourceNum + 1:
                 # Modify an existing button
                 button = self.sourceButtons[sourceNum]
@@ -459,6 +624,11 @@ class Application(tk.Frame):
 
                 self.sourceButtons.append(button)
 
+            if sourceData['Silence'] is True:
+                button.config(text=sourceData['ButtonLabel'] + ' - ' + 'Silence!')
+            else:
+                button.config(text=sourceData['ButtonLabel'])
+
             if sourceData['GPI_IndicationOnly'] is True:
                 # If we're only using this button for indications, don't change the colour here
                 pass
@@ -472,7 +642,8 @@ class Application(tk.Frame):
                 # This channel is not currently selected
                 button.config(bg = "#FFFFFF", fg = "#000000", activebackground = "#EEEEEE", activeforeground = "#000000")
     
-    def sourceBtnPress(self, sourceNum):
+    def sourceBtnPress(self, sourceNum, trigger='manual'):
+        self.switchReason = trigger
         # Immediatly trigger a change to the destination/output
         if self.LWRP_Sources[sourceNum]['DisableRouteChange'] is True:
             # This button doesn't need to actually change any LWRP routes
@@ -489,6 +660,10 @@ class Application(tk.Frame):
         elif self.LWRP_Sources[sourceNum]['LWMulticastNumber'] is not None:
             # Multicast-based addressing
             self.LWRP.setDestination(self.LWRP_OutputChannel, self.LWRP_Sources[sourceNum]['LWMulticastNumber'])
+            currentInput = self.LWRP_Sources[sourceNum]['LWNumber']
+            # Issue SNMP Trap
+            asyncio.run(self.send_input_changed_trap(currentInput))
+            self.previousInput = self.LWRP_Sources[sourceNum]['LWNumber']
 
         else:
             # Invalid address
@@ -517,7 +692,7 @@ class Application(tk.Frame):
                     self.root.after(trigger['Momentary'] * 1000, lambda: self.LWRP_GPIO_Triggers[trigger['DeviceIP']]['Connection'].setGPI(trigger['Port'], trigger['Pin'], "high"))
 
             else:
-                print "Cannot set GPIO Trigger for source number", sourceNum
+                print ("Cannot set GPIO Trigger for source number", sourceNum)
 
     def setErrorMessage(self, message = None, mode = "replace"):
         # Error Message Label
@@ -551,6 +726,11 @@ class Application(tk.Frame):
 
     def close(self):
         # Terminate the application
+        # Stop priority monitor thread if running
+        try:
+            self.stopPriorityMonitor()
+        except:
+            pass
         if self.LWRP is not None:
             self.LWRP.stop()
         
@@ -607,9 +787,8 @@ class Application(tk.Frame):
             else:
                 self.newVersion = False
             
-        except Exception, e:
-            print "ERROR Checking for Updates:", e
-
+        except Exception as e:
+            print ("ERROR Checking for Updates:", e)
 
 if __name__ == "__main__":
     app = Application()
