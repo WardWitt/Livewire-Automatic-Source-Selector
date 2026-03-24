@@ -1,3 +1,3 @@
-cd /home/pi/Livewire-Simple-Delegation-Switcher/
-sleep 10
-python2 LW-Delegation-Switcher.py
+cd /home/engineer/Livewire-Simple-Delegation-Switcher/
+sleep 20
+python LW-Delegation-Switcher.py

@@ -1,0 +1,55 @@
+STL-SWITCHER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, enterprises
+        FROM SNMPv2-SMI
+    DisplayString
+        FROM SNMPv2-TC;
+
+mySwitcher MODULE-IDENTITY
+    LAST-UPDATED "202603180000Z"
+    ORGANIZATION "William Harrison"
+    CONTACT-INFO "billfrog@hotmail.com"
+    DESCRIPTION "Input Switcher SNMP MIB"
+    ::= { enterprises 65248 }
+
+-- Structure
+switcherObjects       OBJECT IDENTIFIER ::= { mySwitcher 1 }
+switcherNotifications OBJECT IDENTIFIER ::= { mySwitcher 2 }
+
+-- Objects (payload)
+currentInput OBJECT-TYPE
+    SYNTAX      INTEGER (1..16)
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION "Currently active input"
+    ::= { switcherObjects 1 }
+
+previousInput OBJECT-TYPE
+    SYNTAX      INTEGER (1..16)
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION "Previously active input"
+    ::= { switcherObjects 2 }
+
+switchReason OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION "Reason for switching"
+    ::= { switcherObjects 3 }
+
+-- Notifications
+inputChanged NOTIFICATION-TYPE
+    OBJECTS { currentInput, previousInput, switchReason }
+    STATUS  current
+    DESCRIPTION "Triggered when input changes"
+    ::= { switcherNotifications 1 }
+
+signalLost NOTIFICATION-TYPE
+    OBJECTS { currentInput }
+    STATUS  current
+    DESCRIPTION "Signal lost on active input"
+    ::= { switcherNotifications 2 }
+
+END
