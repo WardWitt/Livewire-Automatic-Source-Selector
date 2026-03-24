@@ -58,6 +58,7 @@ Under some circumstances, you may also like to set option "DisableRouteChange" t
 3. Open Terminal and run the following commands:
 
 ```
+pip install pysnmp --break-system-packages
 git clone https://github.com/WardWitt/Livewire-Simple-Delegation-Switcher.git
 chmod +x Livewire-Simple-Delegation-Switcher/start.sh
 echo "~/Livewire-Simple-Delegation-Switcher/start.sh" >> ~/.config/labwc/autostart
@@ -86,52 +87,6 @@ python LW-Delegation-Switcher.py
 ```
 cd ~/Livewire-Simple-Delegation-Switcher
 git pull
-```
-
-### Disabling the Screensaver on a Raspberry Pi
-
-If you run this application on a Raspberry Pi, you're going to need to disable the screensaver. There's a couple of ways to do this, depending on your version of Raspbian:
-
-#### Method 1
-
-1. Install XScreensaver, by using the following terminal command:
-
-```
-sudo apt-get install xscreensaver
-```
-
-2. Open the menu in the top-left corner of your desktop.
-3. Go to Preference > Screensaver.
-4. Select "Disable Screensaver"
-5. Reboot your Pi for the changes to work
-
-
-#### Method 2
-
-```
-sudo nano /etc/lightdm/lightdm.conf
-```
-
-Find (Ctrl + W):
-
-```
-#xserver-command=X
-```
-
-Change it to:
-
-```
-xserver-command=X -s 0 dpms
-```
-
-#### Method 3
-
-Add these lines to .config/lxsession/LXDE-pi/autostart:
-
-```
-@xset s noblank 
-@xset s off 
-@xset -dpms
 ```
 
 ## License
