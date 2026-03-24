@@ -1,0 +1,39 @@
+{
+    "Title": "Livewire STL Switcher",
+    "DeviceIP": "192.168.6.247",
+    "DevicePassword": "",
+    "DeviceOutputNum": 1,
+    "Columns": 1,
+    "CheckUpdatesAuto": true,
+    "GPI_DeviceIP": "192.168.6.247",
+    "GPI_DevicePassword": "",
+    "SilenceDetectEnabled" : true,
+    "SilenceThreshold": -500,
+    "SilenceDuration": 10000,
+    "PriorityAutoEnabled": true,
+    "PriorityCount": 5,
+    "PriorityStableTime": 5,
+    "SNMPTrapRX": "192.168.6.128",
+    "Sources": [
+        {
+            "Name": "Fiber",
+            "SourceNum": "1"
+        },
+        {
+            "Name": "Microwave",
+            "SourceNum": "8"
+        },
+        {
+            "Name": "IP",
+            "SourceNum": "3"
+        },
+        {
+            "Name": "MP3",
+            "SourceNum": "4"
+        },
+        {
+            "Name": "End Times",
+            "SourceNum": "7"
+        }
+    ]
+}
