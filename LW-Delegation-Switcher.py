@@ -17,7 +17,7 @@ import tkinter as tk
 import tkinter.messagebox as tkMessageBox
 from functools import partial
 import math
-import requests
+# import requests
 import threading
 
 import asyncio
@@ -83,11 +83,6 @@ class Application(tk.Frame):
     # Which column are we currently rendering?
     columnCurrentNum = 0
 
-    # Should we automatically check for version updates when the app starts up?
-    autoCheckVersion = True
-
-    newVersion = False
-
     # This is a queue of events to execute in the main GUI thread
     callbackEventQueue = []
 
@@ -134,10 +129,6 @@ class Application(tk.Frame):
             self.root.geometry('%dx%d+%d+%d' % (self.defaultWindowWidth, self.defaultWindowHeight, self.defaultWindowPosX, self.defaultWindowPosY))
 
         self.setupMainInterface()
-
-        if self.autoCheckVersion is True:
-            # Check for version updates in another thread
-            threading.Thread(target=self.versionCheck, daemon=True).start()
         
         # Start executing callback events in the main thread
         self.root.after(10, self.callbackMainThreadExecution)
@@ -197,9 +188,6 @@ class Application(tk.Frame):
         if "DefaultWindowPosX" in config and "DefaultWindowPosY" in config:
             self.defaultWindowPosX = int(config['DefaultWindowPosX'])
             self.defaultWindowPosY = int(config['DefaultWindowPosY'])
-
-        if "CheckUpdatesAuto" in config and config['CheckUpdatesAuto'] is False:
-            self.autoCheckVersion = False
 
         if "GPI_DeviceIP" in config and config['GPI_DeviceIP'] is not None:
             self.LWRP_GPI_IpAddress = config['GPI_DeviceIP']
@@ -584,7 +572,6 @@ class Application(tk.Frame):
         # Create the main menu
         menubar = tk.Menu()
         menubar.add_command(label = "About", command = self.about)
-        menubar.add_command(label = "Updates", command = self.updates)
         menubar.add_command(label = "Quit!", command = self.close)
         self.top.config(menu = menubar)
 
@@ -742,53 +729,6 @@ class Application(tk.Frame):
                 self.LWRP_GPIO_Triggers[trigger]['Connection'].stop()
         
         self.root.destroy()
-
-    def updates(self):
-        if self.autoCheckVersion is False:
-            # Send a check for new updates
-            self.versionCheck("popup")
-
-        elif self.newVersion is True:
-            variable = tkMessageBox.showinfo('Software Updates', 'You currently have version v' + __version__ + '\r\nVersion v' + self.newVersionNum + ' is available\r\nDownload website: ' + self.newVersionURL)
-        else:
-            variable = tkMessageBox.showinfo('Software Updates', 'You currently have the latest version v ' + __version__)
-
-    def versionCheck(self, mode = "toolbar"):
-        # This simple version checker will prompt the user to update if required
-        r_data = {
-            'version': __version__,
-            'product': __product__
-        }
-
-        try:
-            r_version = requests.post("http://api.mediarealm.com.au/versioncheck/", data = r_data)
-            r_version_response = r_version.json()
-
-            self.autoCheckVersion = True
-
-            if r_version_response['status'] == "update-available" and mode == "toolbar":
-                self.setErrorMessage(r_version_response['message'], "append")
-                self.newVersion = True
-                self.newVersionNum = r_version_response['version_latest']
-                self.newVersionText = r_version_response['message']
-                self.newVersionURL = r_version_response['url_download']
-
-            elif r_version_response['status'] == "update-available" and mode == "popup":
-                self.newVersion = True
-                self.newVersionNum = r_version_response['version_latest']
-                self.newVersionText = r_version_response['message']
-                self.newVersionURL = r_version_response['url_download']
-                self.updates()
-            
-            elif mode == "popup":
-                self.newVersion = False
-                self.updates()
-            
-            else:
-                self.newVersion = False
-            
-        except Exception as e:
-            print ("ERROR Checking for Updates:", e)
 
 if __name__ == "__main__":
     app = Application()
