@@ -1,4 +1,4 @@
-# [Livewire Simple Delegation Switcher](https://mediarealm.com.au/livewire-switcher/)
+# Livewire Automatic Source Selector
 
 This application allows you to simply switch between different Livewire Sources (Inputs) and send them to a single Livewire Destination (Output). It's designed to be used as a simple studio delegation switcher. It also supports GPI as inputs (either to switch, or change the button indications), and GPIO Trigger outputs. It runs on Raspberry Pi.
 
@@ -59,16 +59,16 @@ Under some circumstances, you may also like to set option "DisableRouteChange" t
 
 ```
 pip install pysnmp --break-system-packages
-git clone https://github.com/WardWitt/Livewire-Simple-Delegation-Switcher.git
-chmod +x Livewire-Simple-Delegation-Switcher/start.sh
-echo "~/Livewire-Simple-Delegation-Switcher/start.sh" >> ~/.config/labwc/autostart
-cp ~/Livewire-Simple-Delegation-Switcher/config-sample-silence-detect.json ~/Livewire-Simple-Delegation-Switcher/config.json
+git clone https://github.com/WardWitt/Livewire-Automatic-Source-Selector.git
+chmod +x Livewire-Automatic-Source-Selector/start.sh
+echo "~/Livewire-Automatic-Source-Selector/start.sh" >> ~/.config/labwc/autostart
+cp ~/Livewire-Automatic-Source-Selector/config-sample-silence-detect.json ~/Automatic-Source-Selector/config.json
 ``` 
 
 4. To edit the configuration, run this command:
 
 ```
-nano ~/Livewire-Simple-Delegation-Switcher/config.json
+nano ~/Livewire-Automatic-Source-Selector/config.json
 ```
 
 Press Ctrl + X to close the Nano text editor.
@@ -76,7 +76,7 @@ Press Ctrl + X to close the Nano text editor.
 6. The Livewire Simple Delegation Switcher should now load automatically whenever you login to your Raspberry Pi (there is a 10 second delay to give the Pi a chance to connect to the network). To start it manually, run the following commands from the terminal:
 
 ```
-cd ~/Livewire-Simple-Delegation-Switcher/
+cd ~/Livewire-Automatic-Source-Selector/
 python LW-Delegation-Switcher.py
 ```
 
@@ -85,7 +85,7 @@ python LW-Delegation-Switcher.py
 1. Open Terminal and run the following commands:
 
 ```
-cd ~/Livewire-Simple-Delegation-Switcher
+cd ~/Livewire-Automatic-Source-Selector
 git pull
 ```
 
