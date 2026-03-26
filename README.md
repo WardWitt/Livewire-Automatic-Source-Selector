@@ -2,7 +2,7 @@
 
 This application allows you to simply switch between different Livewire Sources (Inputs) and send them to a single Livewire Destination (Output). It's designed to be used as a simple studio delegation switcher. It also supports GPI as inputs (either to switch, or change the button indications), and GPIO Trigger outputs. It runs on Raspberry Pi.
 
-![Livewire Simple Delegation Switcher - Screenshot](https://mediarealm.com.au/wp-content/uploads/2017/07/Livewire-Simple-Delegation-Switcher-Screenshot.png)
+![Livewire Simple Delegation Switcher - Screenshot](screen.png)
 
 You could use the PathfinderPC software. However, most small radio station's don't have the budget to buy this. If all you need to do is switch between a couple of different sources, Pathfinder may seem a little excessive.
 
