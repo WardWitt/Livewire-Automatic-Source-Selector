@@ -1,11 +1,11 @@
 """ A simple Studio Delegation Switcher for Livewire """
+""" Originally by Anthony Eden / Media Realm"""
+""" Forked by Ward Witt 2026 """
 
-__product__     = "Livewire Simple Delegation Switcher"
-__author__      = "Anthony Eden"
-__copyright__   = "Copyright 2017-2018, Anthony Eden / Media Realm"
-__credits__     = ["Anthony Eden"]
+__product__     = "Livewire Automatic Source Selector"
+__author__      = "Ward Witt"
 __license__     = "GPL"
-__version__     = "1.7.0"
+__version__     = "1.0 beta 1"
 
 import os, sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/libs")
@@ -32,7 +32,7 @@ class Application(tk.Frame):
     errorLabel = None
 
     # The configurable text to put at the top of the main windows
-    titleLabel = "Livewire Simple Delegation Switcher"
+    titleLabel = "Livewire Automatic Source Selector"
 
     defaultWindowWidth = None
     defaultWindowHeight = None
@@ -709,7 +709,7 @@ class Application(tk.Frame):
             self.errorLabel.config(text = self.errorLabel.cget("text") + "\r\n" + message)
 
     def about(self):
-        variable = tkMessageBox.showinfo('Livewire Simple Delegation Switcher', 'Livewire Simple Delegation Switcher\nCreated by Anthony Eden (http://mediarealm.com.au/)\nVersion: ' + __version__)
+        variable = tkMessageBox.showinfo('Livewire Autimatic Source Selector', 'Livewire Automatic Source Selector\nCreated by Ward Witt\nVersion: ' + __version__)
 
     def close(self):
         # Terminate the application
@@ -732,5 +732,5 @@ class Application(tk.Frame):
 
 if __name__ == "__main__":
     app = Application()
-    app.master.title('Livewire Simple Delegation Switcher')
+    app.master.title('Livewire Automatic Source Selector')
     app.mainloop()
